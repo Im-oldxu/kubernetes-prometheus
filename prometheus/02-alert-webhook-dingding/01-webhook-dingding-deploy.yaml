@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webhook-dingding
+  namespace: kube-prom
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dingding
+  template:
+    metadata:
+      labels:
+        app: dingding
+    spec:
+      containers:
+      - name: dingding
+        image: oldxu3957/webhook_dingding_oldxu:v1.0
+        args: ["--port","5002"]
+        ports:
+        - containerPort: 5002

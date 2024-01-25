@@ -1,0 +1,47 @@
+groups:
+- name: tomcat告警规则
+  rules:
+  - alert: Tomcat活跃连接数过高
+    expr: tomcat_connections_active_total / tomcat_connections_active_max * 100 >= 20
+    for: 1m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Tomcat服务器活跃连接数过高, 实例:{{ $labels.instance }}"
+      description:
+        Tomcat最大连接数是 {{ printf `tomcat_connections_active_max{instance="%s",job="%s",name="%s"}` $labels.instance $labels.job $labels.name | query | first | value }}
+        Tomcat目前连接数是 {{ printf `tomcat_connections_active_total{instance="%s",job="%s",name="%s"}` $labels.instance $labels.job $labels.name | query | first | value }}
+        Tomcat活跃连接数已超过最大活跃连接数的80%, 当前值为 {{ $value }}%
+
+
+  - alert: Tomcat处理请求超过5秒
+    expr: rate(tomcat_requestprocessor_time_seconds[5m]) > 5
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Tomcat处理请求时间过长, 实例:{{ $labels.instance }}"
+      description: "Tomcat在过去5分钟的平均处理请求时间超过5秒，当前值 {{ $value }}。"
+
+
+  - alert: "Tomcat会话拒绝率超过20%"
+    expr: (tomcat_session_rejected_total / (tomcat_session_created_total + tomcat_session_rejected_total)) * 100 > 20
+    for: 5m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Tomcat会话拒绝率过高, 实例:{{ $labels.instance }}"
+      description: "Tomcat在Host:{{ $labels.host }} 的 {{ $labels.context }} 的上下文中的会话拒绝率超过20%，当前值 {{ $value }}。"
+
+
+  - alert: "Tomcat线程使用率过高"
+    expr: (tomcat_threads_active_total / tomcat_threads_max) * 100 > 80
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Tomcat线程使用率过高, 实例:{{ $labels.instance }}"
+      description:
+        Tmcat最大线程数是 {{ printf `tomcat_threads_max{instance="%s",job="%s",name="%s"}` $labels.instance $labels.job $labels.name | query | first | value }}
+        Tomcat目前线程数是 {{ printf `tomcat_threads_active_total{instance="%s",job="%s",name="%s"}` $labels.instance $labels.job $labels.name | query | first | value }}
+        Tomcat线程数已超过最大活跃连接数的80%, 当前值为 {{ $value }}%

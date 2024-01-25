@@ -1,0 +1,120 @@
+groups:
+- name: redis告警规则
+  rules:
+  - alert: Redis实例宕机
+    expr: sum(redis_up) by (instance, job) == 0
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Redis实例宕机, {{ $labels.instance }} "
+      description: "Redis实例 {{ $labels.instance }} 在过去1分钟内无法连接。"
+
+  - alert: Redis实例重启
+    expr: sum(redis_uptime_in_seconds) by (instance, job) < 60
+    for: 0m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Redis实例 {{ $labels.instance }} 重启"
+      description: "Redis实例 {{ $labels.instance }} 出现重启。当前运行时间: {{ $value }} 秒。"
+
+  - alert: Redis连接数过高
+    expr: redis_connected_clients / redis_config_maxclients * 100 > 80
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Redis实例 {{ $labels.instance }} 连接数超过80%"
+      description: "Redis实例 {{ $labels.instance }} 当前连接数占最大连接数的比率超过80%。当前比率: {{ $value }}%。"
+
+  - alert: Redis连接被拒绝
+    expr: increase(redis_rejected_connections_total[1h]) > 0
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Redis实例 {{ $labels.instance }} 有连接被拒绝"
+      description: "Redis实例 {{ $labels.instance }} 在过去1小时内有连接被拒绝。当前被拒绝的连接数: {{ $value }}。"
+
+  - alert: Redis内存使用率过高
+    expr: redis_memory_used_bytes / redis_memory_max_bytes * 100 > 80
+    for: 5m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Redis实例 {{ $labels.instance }} 内存使用率超过80%"
+      description: "Redis实例 {{ $labels.instance }} 当前内存使用率超过配置的最大内存值的80%。当前内存使用率: {{ $value }}%。"
+
+  - alert: Redis缓存命中率低
+    expr: |
+      irate(redis_keyspace_hits_total[5m]) / 
+      (irate(redis_keyspace_hits_total[5m]) + irate(redis_keyspace_misses_total[5m])) * 100 < 90
+    for: 10m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Redis实例 {{ $labels.instance }} 缓存命中率低于90%"
+      description: "Redis实例 {{ $labels.instance }} 最近5分钟内的缓存命中率低于90%。当前命中率: {{ $value }}%。"
+
+  - alert: Redis即将过期的Key数量过多
+    expr: |
+      sum(redis_db_keys_expiring) by (instance, job, db) / 
+      sum(redis_db_keys) by (instance, job, db) * 100 > 50
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Redis实例 {{ $labels.instance }} 中的数据库 {{ $labels.db }} 有过多即将过期的Key"
+      description: "Redis实例 {{ $labels.instance }} 中的数据库 {{ $labels.db }} 有超过50%的Key即将过期。当前比率: {{ $value }}%。"
+
+
+  - alert: RedisRDB备份失败
+    expr: redis_rdb_last_bgsave_status == 0
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Redis实例 {{ $labels.instance }} RDB备份失败"
+      description: "Redis实例 {{ $labels.instance }} 最近的RDB备份尝试失败。"
+
+  - alert: RedisRDB备份时间过长
+    expr: redis_rdb_last_bgsave_duration_sec > 3 and redis_rdb_last_bgsave_status == 1
+    for: 1m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Redis实例 {{ $labels.instance }} RDB备份成功但耗时超过3秒"
+      description: "Redis实例 {{ $labels.instance }} RDB备份成功，但备份耗时超过了3秒。持续时间: {{ $value }}秒。"
+
+  - alert: RedisRDB备份过期
+    expr: (time() - redis_rdb_last_save_timestamp_seconds) > 36000
+    for: 5m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Redis实例 {{ $labels.instance }} 超过10小时未进行RDB备份"
+      description: "Redis实例 {{ $labels.instance }} 已超过10小时没有生成新的RDB备份文件。"
+
+
+  - alert: Redis命令拒绝率过高
+    expr: |
+      sum(irate(redis_commands_rejected_calls_total[5m])) by (instance, job) / 
+      sum(irate(redis_commands_total[5m])) by (instance, job) * 100 > 25
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Redis实例 {{ $labels.instance }} 命令拒绝率超过25%"
+      description: "Redis实例 {{ $labels.instance }} 的命令拒绝率超过了25%。当前拒绝率: {{ $value }}%。"
+
+  - alert: Redis命令平均响应时间过长
+    expr: |
+      sum(rate(redis_commands_duration_seconds_total[5m])) by (instance, job) / 
+      sum(rate(redis_commands_processed_total[5m])) by (instance, job) > 0.250
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Redis实例 {{ $labels.instance }} 命令平均响应时间超过250ms"
+      description: "Redis实例 {{ $labels.instance }} 的执行命令平均响应时间超过了250毫秒。当前平均响应时间: {{ $value }}秒。"

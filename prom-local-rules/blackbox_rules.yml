@@ -1,0 +1,73 @@
+groups:
+- name: Blackbox告警规则文件
+  rules:
+  - alert: 探测失败
+    expr: sum(probe_success == 0) by (instance, job)
+    for: 5m
+    labels:
+      severity: critical
+    annotations:
+      summary: "实例 {{ $labels.instance }} 探测失败"
+      description: "探测目标 {{ $labels.instance }} 在 job {{ $labels.job }} 中失败。"
+
+  - alert: 站点整体平均请求时间过长
+    expr: sum(avg_over_time(probe_http_duration_seconds[1m])) by (instance,job) > 3
+    for: 1m
+    labels:
+      severity: warning
+    annotations:
+      summary: "实例 {{ $labels.instance }} 请求时间过长"
+      description: "实例 {{ $labels.instance }} 最近1分钟的平均请求时间超过3秒。当前平均请求时间：{{ $value }}秒。"
+
+  - alert: 重定向次数过多
+    expr: probe_http_redirects > 5
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "实例 {{ $labels.instance }} 重定向次数过多"
+      description: "实例 {{ $labels.instance }} 在最近的探测中重定向次数超过5次。当前次数：{{ $value }}次。"
+
+
+  - alert: 站点阶段耗时过长
+    expr: |
+      (
+        probe_http_duration_seconds{phase="connect"} > 0.5 or
+        probe_http_duration_seconds{phase="processing"} > 0.5 or
+        probe_http_duration_seconds{phase="resolve"} > 0.5 or
+        probe_http_duration_seconds{phase="tls"} > 0.5 or
+        probe_http_duration_seconds{phase="transfer"} > 0.5
+      )
+    for: 1m
+    labels:
+      severity: warning
+    annotations:
+      summary: "实例 {{ $labels.instance }} 阶段 '{{ $labels.phase }}' 耗时过长"
+      description: "实例 {{ $labels.instance }} 在阶段 '{{ $labels.phase }}' 的耗时超过0.5秒。当前耗时：{{ $value }}秒。"
+
+  - alert: 站点响应状态码异常
+    expr: probe_http_status_code <= 199 or probe_http_status_code >= 400
+    for: 5m
+    labels:
+      severity: critical
+    annotations:
+      summary: "实例 {{ $labels.instance }} 返回异常状态码"
+      description: "实例 {{ $labels.instance }} 返回的状态码为 {{ $value }}，表明请求可能存在问题。"
+
+  - alert: 证书即将过期<30
+    expr: (probe_ssl_earliest_cert_expiry - time()) /86400 < 30
+    for: 24h
+    labels:
+      severity: critical
+    annotations:
+      summary: "实例 {{ $labels.instance }} 的 SSL 证书即将过期"
+      description: "实例 {{ $labels.instance }} 的 SSL 证书将在 {{ $value }} 天内过期。"
+
+  - alert: 证书即将过期<7
+    expr: (probe_ssl_earliest_cert_expiry - time()) /86400 < 7
+    for: 24h
+    labels:
+      severity: critical
+    annotations:
+      summary: "实例 {{ $labels.instance }} 的 SSL 证书即将过期"
+      description: "实例 {{ $labels.instance }} 的 SSL 证书将在 {{ $value }} 天内过期。"

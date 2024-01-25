@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: alertmanager
+  namespace: kube-prom
+spec:
+  serviceName: "alertmanager-svc"
+  podManagementPolicy: "Parallel"   # 并行创建，alert不用考虑先后次序
+  replicas: 3
+  selector:
+    matchLabels:
+      app: alert
+  template:
+    metadata:
+      labels:
+        app: alert
+    spec:
+      volumes:
+      - name: alert-cfg
+        configMap:
+          name: alert-configs
+      - name: alert-temp-cfg
+        configMap:
+          name: alert-template
+      containers:
+      - name: alertmanager
+        image: prom/alertmanager:v0.26.0
+        args:
+        - "--web.listen-address=:9093"
+        - "--cluster.listen-address=0.0.0.0:9094"
+        - "--cluster.peer=alertmanager-0.alertmanager-svc:9094"
+        - "--cluster.peer=alertmanager-1.alertmanager-svc:9094"
+        - "--cluster.peer=alertmanager-2.alertmanager-svc:9094"
+        - "--cluster.peer-timeout=60s"
+        - "--data.retention=120h"
+        - "--storage.path=/etc/alertmanager/data"
+        - "--config.file=/etc/alertmanager/alertmanager.yml"
+        volumeMounts:
+        - name: alert-cfg
+          mountPath: /etc/alertmanager/
+        - name: alert-temp-cfg
+          mountPath: /etc/alertmanager/template/
+        - name: alert-data
+          mountPath: /etc/alertmanager/data
+        ports:
+        - name: web
+          containerPort: 9093
+        - name: cluster
+          containerPort: 9094
+        resources:
+          requests:
+            cpu: 100m
+            memory: 100Mi
+          limits:
+            cpu: 100m
+            memory: 100Mi
+  volumeClaimTemplates:
+    - metadata:
+        name: alert-data
+      spec:
+        accessModes: ["ReadWriteMany"]
+        storageClassName: "nfs-provisioner-storage"
+        resources:
+          requests:
+            storage: 10Gi
+

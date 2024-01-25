@@ -1,0 +1,29 @@
+groups:
+- name: domain告警规则文件
+  rules:
+  - alert: 域名即将过期 <100
+    expr: domain_expiry_days < 100
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "域名即将过期 (实例 {{ $labels.instance }})"
+      description: "域名 {{ $labels.domain }} 还有少于100天即将过期。当前剩余天数：{{ $value }}。"
+
+  - alert: 域名即将过期<30
+    expr: domain_expiry_days < 30
+    for: 5m
+    labels:
+      severity: critical
+    annotations:
+      summary: "域名即将过期 (实例 {{ $labels.instance }})"
+      description: "域名 {{ $labels.domain }} 还有少于30天即将过期。当前剩余天数：{{ $value }}。"
+  
+  - alert: 域名检测失败
+    expr: sum(domain_probe_success) by (domain, instance, job) == 0
+    for: 5m
+    labels:
+      severity: critical
+    annotations:
+      summary: "域名检测失败 (实例 {{ $labels.instance }})"
+      description: "域名 {{ $labels.domain }} 在 {{ $labels.instance }} 上的检测失败。当前值：{{ $value }}。"

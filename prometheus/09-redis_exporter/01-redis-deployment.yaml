@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  namespace: default
+spec:
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/scheme: "http"
+        prometheus.io/port: "9121"
+    spec:
+      containers:
+      - name: redis
+        image: redis:6
+        command: ["redis-server"]
+        args: ["--maxmemory", "200mb"]
+        ports:
+        - containerPort: 6379
+      - name: redis-exporter
+        image: oliver006/redis_exporter:v1.55.0
+        ports:
+        - containerPort: 9121
+

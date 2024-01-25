@@ -1,0 +1,47 @@
+groups:
+- name: rabbitmq告警规则
+  rules:
+  - alert: RabbitMQ队列已就绪的消息过多
+    expr: avg_over_time(rabbitmq_queue_messages_ready[5m]) > 500
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: '{{ $labels.instance }} RabbitMQ实例的队列消息准备过多'
+      description: '{{ $labels.instance }}实例中平均准备好待消费的消息数量超过500，当前平均值为{{ $value }}。'
+
+  - alert: RabbitMQ队列中已消费但未确认的消息过多
+    expr: avg_over_time(rabbitmq_queue_messages_unacked[5m]) > 500
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: '{{ $labels.instance }} RabbitMQ实例的队列消息确认存在延迟'
+      description: '{{ $labels.instance }} 实例中平均已被消费但未被确认的消息数量超过500，当前平均值为{{ $value }}。'
+
+  - alert: RabbitMQ磁盘空间预测不足
+    expr: predict_linear(rabbitmq_disk_space_available_bytes[24h], 60*60*24*10) < rabbitmq_disk_space_available_limit_bytes
+    for: 1h
+    labels:
+      severity: critical
+    annotations:
+      summary: '{{ $labels.instance }} RabbitMQ实例的磁盘空间预测不足。'
+      description: '基于过去24小时磁盘可用空间数据预测，未来10天内磁盘的可用空间可能低于默认配置的50MB。'
+  
+  - alert: RabbitMQ文件描述符使用率过高
+    expr: max_over_time(rabbitmq_process_open_fds[5m]) / rabbitmq_process_max_fds * 100 > 80
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: '{{ $labels.instance }} RabbitMQ实例的文件描述符使用率过高'
+      description: '{{ $labels.instance }} 实例打开的文件描述符数量最大值，占文件描述限制的比率超过80%，当前比率为{{ $value }}%。'
+  
+  - alert: RabbitMQ TCP套接字使用率过高
+    expr: max_over_time(rabbitmq_process_open_tcp_sockets[5m]) / rabbitmq_process_max_tcp_sockets * 100 > 80
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: '{{ $labels.instance }} RabbitMQ实例的TCP套接字使用率过高'
+      description: '{{ $labels.instance }} 实例打开的TCP套接字数量最大值，占操作系统允许的TCP连接数限制的比率超过80%，当前比率为{{ $value }}%。'

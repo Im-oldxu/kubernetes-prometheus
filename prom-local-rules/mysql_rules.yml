@@ -1,0 +1,108 @@
+groups:
+- name: mysql告警规则
+  rules:
+  - alert: MySQL主库实例宕机
+    expr: mysql_up{role="master"} == 0
+    for: 0m
+    labels:
+      severity: critical
+    annotations:
+      summary: "MySQL实例宕机, 实例: {{ $labels.instance }}"
+      description: "服务:{{ $labels.service }} 角色: {{ $labels.role }} 已经宕机。"
+
+  - alert: MySQL从库实例宕机
+    expr: mysql_up{role="slave"} == 0
+    for: 0m
+    labels:
+      severity: critical
+    annotations:
+      summary: "MySQL实例宕机, 实例: {{ $labels.instance }}"
+      description: "服务:{{ $labels.service }} 角色: {{ $labels.role }} 已经宕机。"
+
+
+  - alert: MySQL实例重启
+    expr: sum(mysql_global_status_uptime) by (instance,job,service,role) < 60
+    for: 0m
+    labels:
+      severity: warning
+    annotations:
+      summary: "MySQL实例重启, 实例 {{ $labels.instance }}"
+      description: "服务:{{ $labels.service }} 角色: {{ $labels.role }} 运行时间小于60s。当前值 {{ $value }}s"
+
+
+  - alert: MySQL连接数使用率超过80%
+    expr: max_over_time(mysql_global_status_threads_connected[5m]) / mysql_global_variables_max_connections * 100 > 80
+    for: 1m
+    labels:
+      severity: warning
+    annotations:
+      summary: "MySQL连接数过高, 实例 {{ $labels.instance }},服务:{{ $labels.service }} 角色: {{ $labels.role }}"
+      description: "该实例MySQL的连接数在过去5分钟内超过了最大连接数的80%, 当前值 {{ $value }}%。"
+
+
+  - alert: MySQL活跃线程数高
+    expr: avg_over_time(mysql_global_status_threads_running[5m]) / mysql_global_variables_max_connections * 100 > 60
+    for: 1m
+    labels:
+      severity: warning
+    annotations:
+      summary: "MySQL活跃线程数过高, 实例 {{ $labels.instance }},服务:{{ $labels.service }} 角色: {{ $labels.role }}"
+      description: "该实例MySQL的活跃线程数在过去5分钟内持续超过了最大连接数的60%, 当前值 {{ $value }}%。"
+
+
+  - alert: MySQL查询率(QPS)过高
+    expr: irate(mysql_global_status_queries[5m]) > 1000
+    for: 1m
+    labels:
+      severity: warning
+    annotations:
+      summary: "MySQL查询率(QPS)超标, 实例 {{ $labels.instance }},服务:{{ $labels.service }} 角色: {{ $labels.role }}"
+      description: "该实例MySQL的查询率(QPS)在过去5分钟内超过1000, 当前值 {{ $value }}。"
+
+  - alert: MySQL事务率(TPS)过高
+    expr: sum(rate(mysql_global_status_commands_total{command=~"(commit|rollback)"}[5m])) without (command) > 100
+    for: 1m
+    labels:
+      severity: warning
+    annotations:
+      summary: "MySQL事务率(TPS)超标, 实例 {{ $labels.instance }},服务:{{ $labels.service }} 角色: {{ $labels.role }}"
+      description: "该实例MySQL的事务率(TPS)在过去5分钟内超过100, 当前值 {{ $value }}。"
+
+
+  - alert: MySQL文件描述符使用率过高
+    expr: mysql_global_status_open_files / mysql_global_variables_open_files_limit * 100 > 80
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "MySQL活跃线程数过高, 实例 {{ $labels.instance }},服务:{{ $labels.service }} 角色: {{ $labels.role }}"
+      description: "该实例MySQL的文件描述符使用率超过80%，当前值 {{ $value }}% 可能需要增加文件描述符限制。"
+
+
+  - alert: Mysql从库IO线程未运行
+    expr: mysql_slave_status_slave_io_running == 0 
+    for: 1m
+    labels:
+      severity: warning
+    annotations:
+      summary: "MySQL从库IO线程已停止, 实例 {{ $labels.instance }}"
+      description: "该MySQL实例IO线程已停止，当前值 {{ $value }}"
+
+  - alert: Mysql从库SQL线程未运行
+    expr: mysql_slave_status_slave_sql_running == 0
+    for: 1m
+    labels:
+      severity: warning
+    annotations:
+      summary: "MySQL从库SQL线程已停止, 实例 {{ $labels.instance }}"
+      description: "该MySQL实例SQL线程已停止，当前值 {{ $value }}"
+
+
+  - alert: Mysql从库复制延迟过高
+    expr: mysql_slave_status_seconds_behind_master - mysql_slave_status_sql_delay  > 5
+    for: 1m
+    labels:
+      severity: warning
+    annotations:
+      summary: "MySQL从库复制延迟过高, 实例 {{ $labels.instance }}"
+      description: "该实例MySQL的复制延迟超过5s，当前值 {{ $value }}s"

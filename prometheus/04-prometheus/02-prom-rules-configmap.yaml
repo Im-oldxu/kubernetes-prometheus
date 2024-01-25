@@ -1,0 +1,805 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prom-rules
+  namespace: kube-prom
+data:
+  node_rules.yml: |-
+    groups:
+    - name: CPU告警规则
+      rules:
+      - alert: 节点CPU使用率超过80%
+        expr: ( 1 - avg(irate(node_cpu_seconds_total{mode="idle"}[1m])) by (instance,job) ) * 100 > 80
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "主机CPU利用率过高，实例：{{ $labels.instance }} , {{ $labels.job }}"
+          description: "该实例的CPU利用率低于20%，当前利用率：{{ $value }}%。可能存在CPU资源浪费情况。"
+      - alert: CPU饱和度过高
+        expr: sum(node_load1) by (instance,job) / (count(node_cpu_seconds_total{mode="idle"}) by (instance,job) * 2) * 100 > 80
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "CPU饱和度过高，实例：{{ $labels.instance }} , {{ $labels.job }}"
+          description: "该实例的1分钟平均CPU负载超过了核心数的两倍，已经持续2分钟，当前CPU饱和度：{{ $value }}%。需要立即检查系统负载情况。"
+    
+      - alert: 主机内存不足
+        expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes)  / node_memory_MemTotal_bytes * 100 > 80
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "主机内存使用率较高, 实例:{{ $labels.instance }}, 任务:{{ $labels.job }}"
+          description: "该实例的内存使用率持续2分钟高于80%，当前利用率：{{ $value }}%"
+    
+    
+      - alert: 内存饱和度高
+        expr: ( 1 - node_memory_SwapFree_bytes / node_memory_SwapTotal_bytes ) * 100 > 30
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "主机内存内存饱和度高, 实例:{{ $labels.instance }}, 任务:{{ $labels.job }}"
+          description: "SWAP内存使用率已连续2分钟超过30%，表明内存饱和度过高，当前SWAP使用率为：{{ $value }}%。"
+    
+
+      - alert: 磁盘空间告急
+        expr: ( node_filesystem_size_bytes{device!="tmpfs"} - node_filesystem_avail_bytes{device!="tmpfs"} ) / node_filesystem_size_bytes{device!="tmpfs"} * 100 > 70
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "实例 {{ $labels.instance }} 磁盘{{ $labels.mountpoint }} 分区空间不足"
+          description: "实例 {{ $labels.instance }} 的磁盘空间使用率已超过 70%，当前使用率为 {{ $value }}%，请及时处理。"
+    
+    
+      - alert: 磁盘Inode空间告急
+        expr: (node_filesystem_files{device!="tmpfs"} - node_filesystem_files_free{device!="tmpfs"} ) / node_filesystem_files{device!="tmpfs"} * 100 > 70
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "实例 {{ $labels.instance }} 磁盘空间不足"
+          description: "实例 {{ $labels.instance }} 的磁盘Inode空间使用率已超过 70%，当前使用率为 {{ $value }}%，请及时处理。"
+    
+      - alert: 磁盘IOPS写入较高
+        #expr: sum(rate(node_disk_writes_completed_total[1m])) by (instance,job) / 120 * 100 >60
+        #round函数可以对值进行四舍五入
+        expr: round(max(irate(node_disk_writes_completed_total[1m])) by (instance,job) / 120 * 100) > 60
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "实例 {{ $labels.instance }} IOPS每秒写入次数超过120次/s"
+          description: 
+            目前磁盘IOPS写入饱和度是 {{ $value }}%
+            目前磁盘IOPS每秒写入最大 {{ printf `max(rate(node_disk_writes_completed_total{instance="%s",job="%s"}[1m]))` $labels.instance $labels.job | query | first | value | printf "%.2f" }} 次/s
+    
+      - alert: 磁盘IOPS读取较高
+        expr: round(max(irate(node_disk_reads_completed_total[1m])) by (instance,job) / 120 * 100) > 60
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "实例 {{ $labels.instance }} IOPS每秒读取次数超过120次/s"
+          description: 
+            目前磁盘IOPS读取饱和度是 {{ $value }}%
+            目前磁盘IOPS每秒读取最大 {{ printf `max(rate(node_disk_reads_completed_total{instance="%s",job="%s"}[1m]))` $labels.instance $labels.job | query | first | value | printf "%.2f" }} 次/s
+    
+    
+      - alert: 磁盘IO写入吞吐较高
+        expr: round(max(rate(node_disk_written_bytes_total[1m])) by (instance,job) / 1024 /1024 / 30 * 100) > 60
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "实例 {{ $labels.instance }} 磁盘IO写入每秒超过最大30MB/s"
+          description: 
+            目前磁盘IO写入吞吐量的饱和度是 {{ $value }}%。
+            目前磁盘IO写入吞吐量每秒最大是 {{ printf `max(rate(node_disk_written_bytes_total{instance="%s",job="%s"}[1m])) /1024/1024` $labels.instance $labels.job | query | first | value | printf "%.2f" }}MB/s
+    
+      - alert: 磁盘IO读取吞吐较高
+        expr: round(max(rate(node_disk_read_bytes_total[1m])) by (instance,job) / 1024 /1024 /30 * 100 ) > 60
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "实例 {{ $labels.instance }} 磁盘IO读取每秒超过最大30MB/s"
+          description:
+            目前磁盘IO读取吞吐量的饱和度是 {{ $value }}%。
+            目前磁盘IO读取吞吐量每秒最大是 {{ printf `max(rate(node_disk_read_bytes_total{instance="%s",job="%s"}[1m])) /1024/1024` $labels.instance $labels.job | query | first | value | printf "%.2f" }}MB/s
+    
+    
+      - alert: 网络下载带宽异常
+        expr: max(irate(node_network_receive_bytes_total[1m]) * 8 / 1024 / 1024) by (instance,job,device) / 50 * 100  >= 80
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "实例 {{ $labels.instance }} 的 {{ $labels.device }}接口下载流量已经超过公司实际50Mbps"
+          description: 
+            目前下载带宽已经达到 {{ printf `(irate(node_network_receive_bytes_total{instance="%s",job="%s",device="%s"}[1m]) * 8 / 1024 / 1024)` $labels.instance $labels.job $labels.device | query | first | value | printf "%.2f" }} Mbps/s
+            目前下载带宽使用率在 {{ $value }}%
+    
+      - alert: 网络上传带宽异常
+        expr: max(irate(node_network_transmit_bytes_total[1m]) * 8 / 1024 / 1024) by (instance,job,device) / 50 * 100 >= 80
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "实例 {{ $labels.instance }} 的 {{ $labels.device }}接口上传流量已经超过公司实际50Mbps"
+          description: 
+            目前上传带宽已经达到 {{ printf `(irate(node_network_transmit_bytes_total{instance="%s",job="%s",device="%s"}[1m]) * 8 / 1024 / 1024)` $labels.instance $labels.job $labels.device | query | first | value | printf "%.2f" }} Mbps/s
+            目前上传带宽使用率在 {{ $value }}%
+    
+    
+      - alert: 网络TCP连接数异常
+        expr: node_nf_conntrack_entries / node_nf_conntrack_entries_limit * 100 > 80
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "实例 {{ $labels.instance }} 的 tcp连接数超过80%"
+          description: 
+            目前TCP连接数是 {{ printf `node_nf_conntrack_entries{instance="%s",job="%s"}` $labels.instance $labels.job | query | first | value | printf "%.2f" }}
+            目前TCP连接使用率是 {{ $value }}%
+    
+      - alert: 节点处于Down状态
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "实例:{{ $labels.instance }} 处于Down状态"
+          description: "{{ $labels.instance }} 节点已连接超时"
+
+  kube_apiserver_rules.yml: |-
+    groups:
+    - name: APIServer告警规则
+      rules:
+      - alert: APIServer请求错误率过高
+        expr: |
+          sum by (instance, namespace, job, group, code, resource, verb,subresource) (rate(apiserver_request_total{code=~"5..|4.."}[5m]))
+          /
+          sum by (instance, namespace, job, group, code, resource, verb,subresource) (rate(apiserver_request_total[5m])) * 100  > 10
+        for: 5m 
+        labels:
+          severity: critical
+        annotations:
+          summary: "APIServer请求错误率超过10%"
+          description: "APIServer实例 {{ $labels.instance }} 在命名空间 {{ $labels.namespace }} 中的 {{ $labels.group }} 组中 {{ $labels.resource }} 类型请求错误率超过10%。当前错误率: {{ $value }}%，请求类型: {{ $labels.verb }}，状态码: {{ $labels.code }}。"
+    
+      - alert: APIServer Mutating请求负载过高
+        expr: avg_over_time(apiserver_current_inflight_requests{request_kind="mutating"}[5m]) > (400 * 0.8)
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "APIServer Mutating请求负载过高"
+          description: "APIServer处理变更性请求的平均负载超过了最大限制的80%。当前负载: {{ $value }}。"
+    
+    
+      - alert: APIServer ReadOnly请求负载过高
+        expr: avg_over_time(apiserver_current_inflight_requests{request_kind="readOnly"}[5m]) > (800 * 0.8)
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "APIServer ReadOnly请求负载过高"
+          description: "APIServer处理只读请求的平均负载超过了最大限制的80%。当前负载: {{ $value }}，实例: {{ $labels.instance }}，命名空间: {{ $labels.namespace }}。"
+      
+      - alert: APIServer平均延迟过高
+        expr: |
+          rate(apiserver_request_duration_seconds_sum{verb!="WATCH"}[5m])
+          /
+          rate(apiserver_request_duration_seconds_count{verb!="WATCH"}[5m]) > 5
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "APIServer平均延迟过高"
+          description: "APIServer实例 {{ $labels.instance }} 对资源 {{ $labels.resource }} 的 {{ $labels.verb }} 请求的平均延迟超过5秒。当前平均延迟: {{ $value }}秒。"
+
+  kube_scheduler_rules.yml: |-
+    groups:
+    - name: scheduler告警规则文件
+      rules:
+      - alert: 调度器每秒调度Pod次数过高
+        expr: rate(scheduler_pod_scheduling_attempts_sum[1m]) > 20
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "调度器每秒调度Pod次数过高 (当前值: {{ $value }}次)"
+          description: "调度器实例 {{ $labels.instance }} 在过去的一分钟内每秒调度的Pod次数超过了20次，当前值为 {{ $value }}次。"
+    
+    
+      - alert: Pending状态的Pod数量过多
+        expr: avg_over_time(scheduler_pending_pods{queue!="active"}[5m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Pending状态的Pod数量过多 (当前值: {{ $value }}个)"
+          description: "调度器实例 {{ $labels.instance }} 在过去五分钟内处于Pending状态的Pod数量平均超过了10个，当前值为 {{ $value }}个。"
+    
+    
+      - alert: 'Pod平均调度尝试次数过多'
+        expr: avg(rate(scheduler_pod_scheduling_attempts_sum[5m])) by (instance, job, pod_name) > 5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Pod平均调度尝试次数过多 (当前值: {{ $value }}次)"
+          description: "调度器实例 `{{ $labels.instance }}` 的Pod在过去五分钟内平均尝试调度次数超过5次，当前值为 {{ $value }}次。"
+    
+      - alert: '调度器扩展点平均延迟过高'
+        expr: | 
+          rate(scheduler_framework_extension_point_duration_seconds_sum[5m])
+          /
+          rate(scheduler_framework_extension_point_duration_seconds_count[5m]) > 1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "调度器扩展点平均延迟过高 (当前值: {{ $value }}秒)"
+          description: "调度器实例 `{{ $labels.instance }}` 的扩展点 `{{ $labels.extension_point }}` 在过去五分钟内平均延迟超过了1秒，当前值为 {{ $value }}秒。"
+
+  kube_etcd_rules.yml: |-
+    groups:
+    - name: etcd告警规则文件
+      rules:
+      - alert: Etcd成员异常下线
+        expr: count(etcd_server_id) by (job) % 2 == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Etcd成员异常下线"
+          description: "Etcd集群成员数量为偶数，可能有成员下线导致集群无法正常提供服务。"
+    
+      - alert: Etcd通信异常
+        expr: etcd_server_has_leader == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Etcd通信异常 (实例: {{ $labels.instance }})"
+          description: "实例 {{ $labels.instance }} 的Etcd节点无法与集群中的其它节点通信。"
+    
+    
+      - alert: Etcd领导者变更频繁
+        expr: rate(etcd_server_leader_changes_seen_total[5m]) > 5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Etcd领导者变更频繁 (实例: {{ $labels.instance }})"
+          description: "在过去的5分钟内，实例 {{ $labels.instance }} 的Etcd领导者变更次数超过了5次，这可能会影响集群稳定性。"
+    
+      - alert: Etcd后端提交到磁盘耗时异常
+        expr: |
+          sum by (instance, job, pod_name) (rate(etcd_disk_backend_commit_duration_seconds_sum[5m])) 
+          / 
+          sum by (instance, job, pod_name) (rate(etcd_disk_backend_commit_duration_seconds_count[5m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Etcd后端提交耗时异常 (实例: {{ $labels.instance }})"
+          description: "实例 {{ $labels.instance }} 的Etcd后端在过去5分钟内提交到磁盘的操作平均耗时超过了2秒。"
+    
+    
+      - alert: Etcd wal日志fsync耗时异常
+        expr: |
+          sum by (instance, job, pod_name) (rate(etcd_disk_wal_fsync_duration_seconds_sum[5m]))
+          /
+          sum by (instance, job, pod_name) (rate(etcd_disk_wal_fsync_duration_seconds_count[5m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Etcd wal日志fsync耗时异常 (实例: {{ $labels.instance }})"
+          description: "实例 {{ $labels.instance }} 的Etcd节点在过去5分钟内日志文件的fsync调用平均耗时超过了2秒。"
+
+  kube_coredns_rules.yml: |-
+    groups:
+    - name: CoreDNS告警规则文件
+      rules:
+      - alert: CoreDNS SERVFAIL响应率过高
+        expr: |
+          sum(rate(coredns_dns_responses_total{rcode="SERVFAIL"}[5m])) by (instance, job, server, pod_name, zone) > 10
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "实例 {{ $labels.instance }} 的 CoreDNS SERVFAIL 响应率过高"
+          description: "在过去5分钟内，实例 {{ $labels.instance }}，CoreDNS Pod名称 {{ $labels.pod_name }}，服务端点 {{ $labels.server }}，区域 {{ $labels.zone }} 的SERVFAIL响应率超过了10次，当前值：{{ $value }}次/秒。请检查CoreDNS服务状态。"
+  
+      - alert: CoreDNS域名解析时延过高
+        expr: |
+          sum(rate(coredns_dns_request_duration_seconds_sum[5m])) by (instance, job, server, pod_name, zone)
+          /
+          sum(rate(coredns_dns_request_duration_seconds_count[5m])) by (instance, job, server, pod_name, zone) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "实例 {{ $labels.instance }} 的 CoreDNS 解析时延超过1秒"
+          description: "在过去5分钟内，实例 {{ $labels.instance }}，CoreDNS Pod名称 {{ $labels.pod_name }}，服务端点 {{ $labels.server }}，区域 {{ $labels.zone }} 的平均域名解析时延超过了1秒，当前平均时延：{{ $value }}秒。"
+
+  kube_proxy_rules.yml: |-
+    groups:
+    - name: kube-proxy告警规则文件
+      rules:
+      - alert: KubeProxy同步时间过长
+        expr: |
+          rate (kubeproxy_sync_proxy_rules_duration_seconds_sum[5m]) /
+          rate (kubeproxy_sync_proxy_rules_duration_seconds_count[5m]) > 3
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "kube-proxy同步时间过长 (实例: {{ $labels.instance }})"
+          description: "实例 {{ $labels.instance }}, kube-proxy同步操作的平均时间超过了3秒。该Pod {{ $labels.pod_name }} 当前同步延迟：{{ $value }}/s"
+      
+      - alert: Iptables规则同步失败次数过多
+        expr: rate(kubeproxy_sync_proxy_rules_iptables_restore_failures_total[5m]) > 10
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Iptables同步失败告警 (实例: {{ $labels.instance }})"
+          description: "实例 {{ $labels.instance }}, iptables规则同步失败次数超过10次。该Pod {{ $labels.pod_name }} 当前失败次数：{{ $value }}"
+
+  kube_state_metrics_rules.yml: |-
+    groups:
+    - name: KMS告警规则文件
+      rules:
+      - alert: 节点kubelet未就绪
+        expr: kube_node_status_condition{condition="Ready", status="false"} == 1
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "节点 {{ $labels.node }} kubelet未就绪"
+          description: "节点 {{ $labels.node }} kubelet已经超过5分钟未处于就绪状态，需要立即检查。"
+
+      - alert: 节点内存压力大
+        expr: kube_node_status_condition{condition="MemoryPressure", status="true"} == 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "节点 {{ $labels.node }} 内存压力过高"
+          description: "节点 {{ $labels.node }} 正在经历内存压力，可能需要增加内存资源或减少工作负载。"
+
+      - alert: 节点网络压力大
+        expr: kube_node_status_condition{condition="NetworkUnavailable",status="true"} == 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "节点 {{ $labels.node }} 网络压力过高"
+          description: "节点 {{ $labels.node }} 的网络接压力过大，可能存在网络瓶颈。"
+
+      - alert: 节点磁盘压力大
+        expr: kube_node_status_condition{condition="DiskPressure", status="true"} == 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "节点 {{ $labels.node }}磁盘压力过高"
+          description: "节点 {{ $labels.node }} 正在经历磁盘压力，磁盘空间或inode可能不足。"
+
+      - alert: 节点PID压力大
+        expr: kube_node_status_condition{condition="PIDPressure", status="true"} == 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "节点 {{ $labels.node }} PID压力过高"
+          description: "节点 {{ $labels.node }} 上的进程数可能已经达到上限。"
+
+      - alert: 启动失败的Pod
+        expr: sum (kube_pod_status_phase{phase=~"Pending|Unknown|Failed"}) by (job, exported_namespace, pod) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Pod启动失败"
+          description: "'{{ $labels.exported_namespace }}' 名称空间中的Pod '{{ $labels.pod }}'启动失败。"
+      
+      - alert: 因为OOM重启的Pod
+        expr: |
+          (kube_pod_container_status_restarts_total - kube_pod_container_status_restarts_total offset 10m >= 1)
+          and ignoring (reason)
+          min_over_time(kube_pod_container_status_last_terminated_reason{reason="OOMKilled"}[10m]) >= 1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.pod }} Pod因OOM重启"
+          description: "'{{ $labels.exported_namespace }}' 名称空间中的Pod '{{ $labels.pod }}' 触发了OOM造成Pod重启,触发OOM的容器是 '{{ $labels.container }}'。"
+
+      - alert: Deployment副本数不一致
+        expr: kube_deployment_spec_replicas - kube_deployment_status_replicas_available > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Deployment副本数不一致"
+          description: "'{{ $labels.exported_namespace }}' 名称空间中 {{ $labels.deployment }} 部署副本数与期望副本数不一致，当前偏差了{{ $value }}个副本。"
+      
+      - alert: DaemonSet副本数不一致
+        expr: |
+          kube_daemonset_status_number_ready / kube_daemonset_status_desired_number_scheduled * 100 < 100
+          or
+          kube_daemonset_status_desired_number_scheduled - kube_daemonset_status_current_number_scheduled > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "DaemonSet副本数不一致"
+          description: "'{{ $labels.exported_namespace }}' 名称空间中 {{ $labels.daemonset }} 期望副本数与实际运行副本数不一致。"
+
+      - alert: DaemonSet调度出现错误
+        expr: kube_daemonset_status_number_misscheduled > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "DaemonSet调度错误"
+          description: "'{{ $labels.exported_namespace }}' 名称空间中 {{ $labels.daemonset }} 调度了错误的Pod。"
+
+      - alert: StatefulSet副本数异常
+        expr: |
+          kube_statefulset_status_replicas_ready  / kube_statefulset_replicas  * 100 < 100
+          or
+          kube_statefulset_replicas - kube_statefulset_status_replicas_current > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "StatefulSet副本数异常"
+          description: "'{{ $labels.exported_namespace }}' 名称空间中 {{ $labels.statefulset }} 期望副本数与实际运行副本数不一致。"
+
+      - alert: PV异常
+        expr: kube_persistentvolume_status_phase{phase="Failed"} > 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "PV异常"
+          description: "持久卷'{{ $labels.persistentvolume }}'处于Failed状态。"
+
+      - alert: PVC异常
+        expr: kube_persistentvolumeclaim_status_phase{phase=~"Lost|Pending"} > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "PVC异常"
+          description: "'{{ $labels.exported_namespace }}' 名称空间中 {{ $labels.persistentvolumeclaim }} 持久卷(PVC)处于 {{ $labels.phase }}状态。"
+
+      - alert: Job完成度低
+        expr: kube_job_status_succeeded / kube_job_spec_completions * 100 < 75
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Job完成度低于75%"
+          description: "'{{ $labels.exported_namespace }}' 名称空间中 {{ $labels.job_name }} Job任务完成度低于预期的75%。"
+
+      - alert: Job失败次数高
+        expr: kube_job_status_failed > 5
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Job失败次数过高"
+          description: "'{{ $labels.exported_namespace }}' 名称空间中 {{ $labels.job_name }} Job任务执行失败次数超过5次以上，当前失败 {{ $value }} 次。"
+
+  kube_pods_rules.yml: |-
+    groups:
+    - name: Pods的告警规则文件
+      rules:
+      - alert: Pod中容器的CPU利用率高
+        expr: sum (rate(container_cpu_usage_seconds_total{image!=""}[5m])) by (instance,job,pod,namespace) * 100 > 80
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "在 '{{ $labels.instance }}' 节点上运行的 '{{ $labels.pod }}' Pod CPU利用率高"
+          description: "在 '{{ $labels.namespace }}' 名称空间中 '{{ $labels.pod }}' Pod的CPU利用率当前为 {{ $value }}%，超过了80%的阈值。"
+    
+      - alert: Pod中容器内存利用率高
+        expr: |
+          sum(container_memory_working_set_bytes{name!=""}) by (instance,job,pod,namespace)
+          /
+          sum(container_spec_memory_limit_bytes{name!=""} > 0) by (instance,job,pod,namespace) * 100 > 80
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "在 '{{ $labels.instance }}' 节点上运行的 '{{ $labels.pod }}' Pod内存利用率高"
+          description: 在 '{{ $labels.namespace }}' 名称空间中 '{{ $labels.pod }}' Pod的内存最大限制是 {{ printf `sum (container_spec_memory_limit_bytes{namespace="%s",pod="%s"} > 0 ) /1024 /1024` $labels.namespace $labels.pod | query | first | value }}MB , 目前利用率已达{{ $value }}%，超过限制的80%。
+
+      - alert: Pod容器网络发送速率过高
+        expr: sum(rate(container_network_transmit_bytes_total{image!=""}[1m])) by (instance,job,pod,namespace) * 8 /1024 /1024 > 50
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "在 '{{ $labels.instance }}' 节点上运行的 '{{ $labels.pod }}' Pod网络发送速率过高"
+          description: "在 '{{ $labels.namespace }}' 名称空间中 '{{ $labels.pod }}' Pod的网络发送速率达到{{ $value }}Mbps，超过了50Mbps的阈值。"
+    
+      - alert: Pod容器网络接收速率过高
+        expr: sum(rate(container_network_receive_bytes_total{image!=""}[1m])) by (instance,job,pod,namespace) * 8 /1024 /1024 > 50
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "在 '{{ $labels.instance }}' 节点上运行的 '{{ $labels.pod }}' Pod网络发送速率过高"
+          description: "在 '{{ $labels.namespace }}' 名称空间中 '{{ $labels.pod }}' Pod的网络接收速率达到{{ $value }}Mbps，超过了50Mbps的阈值。"
+    
+      - alert: Pod容器磁盘写入吞吐量过大
+        expr: sum (rate(container_fs_writes_bytes_total{name!=""}[1m])) by (instance,job,pod,namespace) /1024 /1024 > 20
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "在 '{{ $labels.instance }}' 节点上运行的 '{{ $labels.pod }}' Pod磁盘写入吞吐量过大"
+          description: "在 '{{ $labels.namespace }}' 名称空间中 '{{ $labels.pod }}' Pod的磁盘写入吞吐量达到{{ $value }}MB/s，超过了20MB/s的阈值。"
+    
+      - alert: Pod容器磁盘读取吞吐量过大
+        expr: sum (rate(container_fs_reads_bytes_total{name!=""}[1m])) by (instance,job,pod,namespace) /1024 /1024 > 20
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "在 '{{ $labels.instance }}' 节点上运行的 '{{ $labels.pod }}' Pod磁盘读取吞吐量过大"
+          description: "在 '{{ $labels.namespace }}' 名称空间中 '{{ $labels.pod }}' Pod的磁盘读取吞吐量达到{{ $value }}MB/s，超过了20MB/s的阈值。"
+  blackbox_tcp_rules.yml: |-
+    groups:
+    - name: Blackbox_tcp告警规则文件
+      rules:
+      - alert: Service TCP探测失败
+        expr: sum(probe_success{job=~".*tcp"}) by (instance,job,namespace,service_name) == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "探测 '{{ $labels.instance }}' Service 的TCP接口探测失败。"
+          description: "'{{ $labels.namespace }}' 名称空间中的 '{{ $labels.service_name }}' Service资源 '{{ $labels.instance }}' 地址探测失败。"
+    
+      - alert: Service TCP请求的响应时间过长
+        expr: probe_duration_seconds{job=~".*tcp"} > 0.500
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "探测 '{{ $labels.instance }}' Service 的TCP响应时间超过了500毫秒。"
+          description: "'{{ $labels.namespace }}' 名称空间中的 '{{ $labels.service_name }}' Service资源 '{{ $labels.instance }}' 当前响应时长为 {{ $value }} 秒。"
+
+      - alert: Service的DNS解析响应时间过长
+        expr: probe_dns_lookup_time_seconds{job=~".*tcp"} > 0.500
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "探测 '{{ $labels.instance }}' Service 的DNS解析响应时间超过了500毫秒。"
+          description: "'{{ $labels.namespace }}' 名称空间中的 '{{ $labels.service_name }}' Service资源 '{{ $labels.instance }}' 当前响应时长为 {{ $value }} 秒。"	  
+    
+  blackbox_http_rules.yml: |-
+    groups:
+    - name: Blackbox_http告警规则文件
+      rules:
+      - alert: 站点平均请求过长
+        expr: sum (avg_over_time(probe_http_duration_seconds[1m])) by (instance,job,namespace,ingress_name) > 3
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "'{{ $labels.instance }}' 域名整体请求时间超过了3秒。"
+          description: "{{ $labels.namespace }} 名称空间 '{{ $labels.instance }}' 域名最近1分钟的平均请求时间超过3秒。当前平均请求时间：{{ $value }}秒。"
+
+      - alert: 站点阶段耗时过长
+        expr: |
+          (
+            probe_http_duration_seconds{phase="connect"} > 1 or
+            probe_http_duration_seconds{phase="processing"} > 1 or
+            probe_http_duration_seconds{phase="resolve"} > 1 or
+            probe_http_duration_seconds{phase="tls"} > 1 or
+            probe_http_duration_seconds{phase="transfer"} > 1
+          )
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "'{{ $labels.instance }}' 域名在 '{{ $labels.phase }}' 阶段耗时过长"
+          description: "{{ $labels.namespace }} 名称空间 '{{ $labels.instance }}' 域名在阶段 '{{ $labels.phase }}' 的耗时超过0.5秒。当前耗时：{{ $value }}秒。"
+
+      - alert: 站点响应状态码异常
+        expr: probe_http_status_code <= 199 or probe_http_status_code >= 400
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "'{{ $labels.instance }}' 域名返回异常状态码"
+          description: "{{ $labels.namespace }} 名称空间 '{{ $labels.instance }}' 域名返回的状态码为 {{ $value }}，表明请求可能存在问题。"
+    
+      - alert: 重定向次数过多
+        expr: probe_http_redirects > 5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "'{{ $labels.instance }}' 域名重定向次数过多"
+          description: "{{ $labels.namespace }} 名称空间 '{{ $labels.instance }}' 域名在最近的探测中重定向次数超过5次。当前次数：{{ $value }}次。"
+
+      - alert: 证书即将过期<30
+        expr: (probe_ssl_earliest_cert_expiry - time()) /86400 < 30
+        for: 24h
+        labels:
+          severity: critical
+        annotations:
+          summary: "'{{ $labels.instance }}' 域名的 SSL 证书即将过期"
+          description: "{{ $labels.namespace }} 名称空间 '{{ $labels.instance }}' 域名的 SSL 证书将在 {{ $value }} 天内过期。"
+    
+      - alert: 证书即将过期<7
+        expr: (probe_ssl_earliest_cert_expiry - time()) /86400 < 7
+        for: 24h
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.instance }}' 域名的 SSL 证书即将过期"
+          description: "{{ $labels.namespace }} 名称空间 {{ $labels.instance }}' 域名的 SSL 证书将在 {{ $value }} 天内过期。"
+
+  jvm_rules.yml: |-
+    groups:
+    - name: "JVM告警规则"
+      rules:
+      - alert: JVM堆内存使用率过高
+        expr: jvm_memory_bytes_used{area="heap",} / jvm_memory_bytes_max{area="heap",} * 100 > 90
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "'{{ $labels.instance }}' 实例的JVM 堆内存使用率超过80%"
+          description: "'{{ $labels.namespace }}' 名称空间下的 '{{ $labels.pod_name }}' PodJVM堆内存使用率超过80%, 当前使用率是 {{ $value }}%"
+
+      - alert: JVMGC时间过长
+        expr: sum (rate(jvm_gc_collection_seconds_sum[5m]) / rate(jvm_gc_collection_seconds_count[5m])) by (instance,job,gc,namespace,pod_name) > 1
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "'{{ $labels.instance }}' 实例的JVM  GC时间超过了1秒。"
+          description: "'{{ $labels.namespace }}' 名称空间下的 '{{ $labels.pod_name }}' Pod使用 {{ $labels.gc }} GC垃圾回收算法时间超过1s，当前值 {{ $value }}秒"
+
+      - alert: JVM死锁线程过多
+        expr: min_over_time(jvm_threads_deadlocked[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "JVM检测到'{{ $labels.instance }}' 实例有死锁线程"
+          description: "'{{ $labels.namespace }}' 名称空间下的 '{{ $labels.pod_name }}' Pod，在过去5分钟检测到死锁线程, 当前死锁线程数是 {{ $value }}。"
+
+  redis_rules.yml: |-
+    groups:
+    - name: redis告警规则
+      rules:
+      - alert: Redis实例宕机
+        expr: redis_up == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "'{{ $labels.instance }}' Redis实例宕机"
+          description: "'{{ $labels.namespace }}' 名称空间中 '{{ $labels.pod_name }}' Pod在过去5分钟内无法连接。"
+
+      - alert: Redis连接数过高
+        expr: redis_connected_clients / redis_config_maxclients * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "'{{ $labels.instance }}' Redis实例连接数超过80%"
+          description: "'{{ $labels.namespace }}' 名称空间中 '{{ $labels.pod_name }}' Pod当前连接数占最大连接数的比率超过80%。当前比率: {{ $value }}%。"
+
+      - alert: Redis连接被拒绝
+        expr: increase(redis_rejected_connections_total[1h]) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "'{{ $labels.instance }}' Redis实例有连接被拒绝"
+          description: "'{{ $labels.namespace }}' 名称空间中 '{{ $labels.pod_name }}' Pod在过去1小时内有连接被拒绝。当前被拒绝的连接数: {{ $value }}。"
+
+      - alert: Redis内存使用率过高
+        expr: redis_memory_used_bytes / redis_memory_max_bytes * 100 > 80
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "'{{ $labels.instance }}' Redis实例内存使用率超过80%"
+          description: "'{{ $labels.namespace }}' 名称空间中 '{{ $labels.pod_name }}' Pod的内存使用率超过配置的最大内存值的80%。当前内存使用率: {{ $value }}%。"
+
+      - alert: Redis缓存命中率低
+        expr: |
+          irate(redis_keyspace_hits_total[5m])
+          / 
+          (irate(redis_keyspace_hits_total[5m]) + irate(redis_keyspace_misses_total[5m])) * 100 < 90
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "'{{ $labels.instance }}' Redis实例缓存命中率低于90%"
+          description: "'{{ $labels.namespace }}' 名称空间中 '{{ $labels.pod_name }}' Pod最近5分钟内的缓存命中率低于90%。当前命中率: {{ $value }}%。"
+
+      - alert: Redis即将过期的Key数量过多
+        expr: |
+          sum(redis_db_keys_expiring) by (instance, job, namespace,pod_name,db)
+          / 
+          sum(redis_db_keys) by (instance, job, namespace,pod_name,db) * 100 > 50
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "'{{ $labels.instance }}' Redis实例中的 '{{ $labels.db }}' 数据库有大量即将过期的Key"
+          description: "'{{ $labels.namespace }}' 名称空间中 '{{ $labels.pod_name }}' Pod中的 '{{ $labels.db }}' 数据库有超过50%的Key即将过期。当前过期比率: {{ $value }}%。"
+
+      - alert: RedisRDB备份失败
+        expr: redis_rdb_last_bgsave_status == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "'{{ $labels.instance }}' Redis实例 RDB备份失败"
+          description: "'{{ $labels.namespace }}' 名称空间中 '{{ $labels.pod_name }}' Pod最近的RDB备份失败。"
+
+      - alert: RedisRDB备份时间过长
+        expr: redis_rdb_last_bgsave_duration_sec > 3 and redis_rdb_last_bgsave_status == 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "'{{ $labels.instance }}' Redis实例 RDB备份成功但耗时超过3秒"
+          description: "'{{ $labels.namespace }}' 名称空间中 '{{ $labels.pod_name }}' Pod, RDB备份成功但耗时超过了3秒。持续时间: {{ $value }}秒。"
+
+      - alert: RedisRDB备份过期
+        expr: (time() - redis_rdb_last_save_timestamp_seconds) > 36000
+        for: 24h
+        labels:
+          severity: critical
+        annotations:
+          summary: "'{{ $labels.instance }}' Redis实例超过10小时未进行RDB备份"
+          description: "'{{ $labels.namespace }}' 名称空间中 '{{ $labels.pod_name }}' Pod已超过10小时没有生成新的RDB备份文件。"
+
+      - alert: Redis命令拒绝率过高
+        expr: |
+          sum(irate(redis_commands_rejected_calls_total[5m])) by (instance,job,namespace,pod_name)
+          / 
+          sum(irate(redis_commands_total[5m])) by (instance,job,namespace,pod_name) * 100 > 25
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "'{{ $labels.instance }}' Redis实例命令拒绝率超过25%"
+          description: "'{{ $labels.namespace }}' 名称空间中 '{{ $labels.pod_name }}' Pod的命令拒绝率超过了25%。当前拒绝率: {{ $value }}%。"
+
+      - alert: Redis命令平均响应时间过长
+        expr: |
+          sum(rate(redis_commands_duration_seconds_total[5m])) by (instance,job,namespace,pod_name)
+          / 
+          sum(rate(redis_commands_processed_total[5m])) by (instance,job,namespace,pod_name) > 0.250
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "'{{ $labels.instance }}' Redis实例命令平均响应时间超过250ms"
+          description: "'{{ $labels.namespace }}' 名称空间中 '{{ $labels.pod_name }}' Pod的执行命令平均响应时间超过了250毫秒。当前平均响应时间: {{ $value }}秒。"

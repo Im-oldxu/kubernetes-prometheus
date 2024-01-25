@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: prometheus
+  namespace: kube-prom
+spec:
+  serviceName: "prometheus-svc"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus
+  template:
+    metadata:
+      labels:
+        app: prometheus
+    spec:
+      serviceAccountName: "prometheus-sa"
+      volumes:
+      - name: prom-cfg
+        configMap:
+          name: prom-configs
+      - name: prom-rules-cfg
+        configMap:
+          name: prom-rules
+      containers:
+      - name: prom
+        image: prom/prometheus:v2.48.1
+        args:
+        - "--config.file=/etc/prometheus/prometheus.yml"
+        - "--storage.tsdb.path=/etc/prometheus/data"
+        - "--storage.tsdb.retention.time=30d"
+        - "--web.enable-lifecycle"
+        volumeMounts:
+        - name: prom-cfg
+          mountPath: /etc/prometheus
+        - name: prom-rules-cfg
+          mountPath: /etc/prometheus/rules
+        - name: prom-data
+          mountPath: /etc/prometheus/data
+        ports:
+        - containerPort: 9090
+        resources:
+          requests:
+            cpu: 2000m
+            memory: 2048Mi
+          limits:
+            cpu: 2000m
+            memory: 2048Mi
+      
+  volumeClaimTemplates:
+    - metadata:
+        name: prom-data
+      spec:
+        accessModes: ["ReadWriteMany"]
+        storageClassName: "nfs-provisioner-storage"
+        resources:
+          requests:
+            storage: 100Gi

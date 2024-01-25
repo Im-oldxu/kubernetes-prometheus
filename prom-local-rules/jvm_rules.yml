@@ -1,0 +1,31 @@
+groups:
+- name: "JVM告警规则"
+  rules:
+  - alert: JVM堆内存使用率过高
+    expr: jvm_memory_bytes_used{area="heap",} / jvm_memory_bytes_max{area="heap",} * 100 > 90
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "JVM 堆内存使用率过高, 实例:{{ $labels.instance }}, job:{{ $labels.job }} "
+      description: "JVM堆内存使用率超过80%, 当前值 {{ $value }}%"
+
+
+  - alert: JVMGC时间过长
+    expr: sum (rate(jvm_gc_collection_seconds_sum[5m]) / rate(jvm_gc_collection_seconds_count[5m])) by (gc, instance, job) > 1
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "JVM GC时间过长, 实例:{{ $labels.instance }}, job:{{ $labels.job }} "
+      description: "JVM {{ $labels.gc }} 的回收时间超过1s，当前值 {{ $value }}s"
+
+
+  - alert: JVM死锁线程过多
+    expr: min_over_time(jvm_threads_deadlocked[5m]) > 0
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "JVM检测到死锁线程"
+      description: "在过去5分钟内JVM检测到存在死锁线程, 当前值 {{ $value }}。"

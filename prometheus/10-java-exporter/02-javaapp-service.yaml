@@ -1,0 +1,22 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: javaapp-svc
+  namespace: default
+  labels:
+    app: java
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/scheme: "http"
+    prometheus.io/path: "/metrics"
+    prometheus.io/port: "12345"
+spec:
+  selector:
+    app: java
+  ports:
+  - name: javaapp
+    port: 8080
+    targetPort: 8080
+  - name: jmx
+    port: 12345
+    targetPort: 12345

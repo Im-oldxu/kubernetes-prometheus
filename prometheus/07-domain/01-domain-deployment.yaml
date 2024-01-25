@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: domain-exporter
+  namespace: kube-prom
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: domain
+  template:
+    metadata:
+      labels:
+        app: domain
+    spec:
+      containers:
+      - name: domain-exporter
+        image: caarlos0/domain_exporter:v1.22.0
+        args:
+        - "--bind=:9222"
+        ports:
+        - containerPort: 9222

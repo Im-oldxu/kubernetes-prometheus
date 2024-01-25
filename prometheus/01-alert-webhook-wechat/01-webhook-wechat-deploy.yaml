@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webhook-wechat
+  namespace: kube-prom
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: wechat
+  template:
+    metadata:
+      labels:
+        app: wechat
+    spec:
+      containers:
+      - name: wechat
+        image: oldxu3957/webhook_wechat_oldxu:v1.0
+        args: ["--port","5001"]
+        ports:
+        - containerPort: 5001

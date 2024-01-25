@@ -1,0 +1,158 @@
+groups:
+- name: CPU告警规则
+  rules:
+  - alert: 节点CPU使用率超过80%
+    expr: ( 1 - avg(irate(node_cpu_seconds_total{mode="idle"}[1m])) by (instance,job) ) * 100 > 80
+    for: 1m
+    labels:
+      severity: warning
+    annotations:
+      summary: "主机CPU利用率过高，实例：{{ $labels.instance }} , {{ $labels.job }}"
+      description: "该实例的CPU利用率低于20%，当前利用率：{{ $value }}%。可能存在CPU资源浪费情况。"
+  - alert: CPU饱和度过高
+    expr: sum(node_load1) by (instance,job) / (count(node_cpu_seconds_total{mode="idle"}) by (instance,job) * 2) * 100 > 80
+    for: 2m
+    labels:
+      severity: critical
+    annotations:
+      summary: "CPU饱和度过高，实例：{{ $labels.instance }} , {{ $labels.job }}"
+      description: "该实例的1分钟平均CPU负载超过了核心数的两倍，已经持续2分钟，当前CPU饱和度：{{ $value }}%。需要立即检查系统负载情况。"
+
+
+- name: 内存告警规则
+  rules:
+  - alert: 主机内存不足
+    expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes)  / node_memory_MemTotal_bytes * 100 > 80
+    for: 2m
+    labels:
+      severity: warning
+    annotations:
+      summary: "主机内存使用率较高, 实例:{{ $labels.instance }}, 任务:{{ $labels.job }}"
+      description: "该实例的内存使用率持续2分钟高于80%，当前利用率：{{ $value }}%"
+
+
+  - alert: 内存饱和度高
+    expr: ( 1 - node_memory_SwapFree_bytes / node_memory_SwapTotal_bytes ) * 100 > 30
+    for: 2m
+    labels:
+      severity: warning
+    annotations:
+      summary: "主机内存内存饱和度高, 实例:{{ $labels.instance }}, 任务:{{ $labels.job }}"
+      description: "SWAP内存使用率已连续2分钟超过30%，表明内存饱和度过高，当前SWAP使用率为：{{ $value }}%。"
+
+
+- name: 磁盘告警规则
+  rules:
+  - alert: 磁盘空间告急
+    expr: ( node_filesystem_size_bytes{device!="tmpfs"} - node_filesystem_avail_bytes{device!="tmpfs"} ) / node_filesystem_size_bytes{device!="tmpfs"} * 100 > 70
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "实例 {{ $labels.instance }} 磁盘{{ $labels.mountpoint }} 分区空间不足"
+      description: "实例 {{ $labels.instance }} 的磁盘空间使用率已超过 70%，当前使用率为 {{ $value }}%，请及时处理。"
+
+
+  - alert: 磁盘Inode空间告急
+    expr: (node_filesystem_files{device!="tmpfs"} - node_filesystem_files_free{device!="tmpfs"} ) / node_filesystem_files{device!="tmpfs"} * 100 > 70
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "实例 {{ $labels.instance }} 磁盘空间不足"
+      description: "实例 {{ $labels.instance }} 的磁盘Inode空间使用率已超过 70%，当前使用率为 {{ $value }}%，请及时处理。"
+
+  - alert: 磁盘IOPS写入较高
+    #expr: sum(rate(node_disk_writes_completed_total[1m])) by (instance,job) / 120 * 100 >60
+    #round函数可以对值进行四舍五入
+    expr: round(max(irate(node_disk_writes_completed_total[1m])) by (instance,job) / 120 * 100) > 60
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "实例 {{ $labels.instance }} IOPS每秒写入次数超过120次/s"
+      description: 
+        目前磁盘IOPS写入饱和度是 {{ $value }}%
+        目前磁盘IOPS每秒写入最大 {{ printf `max(rate(node_disk_writes_completed_total{instance="%s",job="%s"}[1m]))` $labels.instance $labels.job | query | first | value | printf "%.2f" }} 次/s
+
+  - alert: 磁盘IOPS读取较高
+    expr: round(max(irate(node_disk_reads_completed_total[1m])) by (instance,job) / 120 * 100) > 60
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "实例 {{ $labels.instance }} IOPS每秒读取次数超过120次/s"
+      description: 
+        目前磁盘IOPS读取饱和度是 {{ $value }}%
+        目前磁盘IOPS每秒读取最大 {{ printf `max(rate(node_disk_reads_completed_total{instance="%s",job="%s"}[1m]))` $labels.instance $labels.job | query | first | value | printf "%.2f" }} 次/s
+
+
+  - alert: 磁盘IO写入吞吐较高
+    expr: round(max(rate(node_disk_written_bytes_total[1m])) by (instance,job) / 1024 /1024 / 30 * 100) > 60
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "实例 {{ $labels.instance }} 磁盘IO写入每秒超过最大30MB/s"
+      description: 
+        目前磁盘IO写入吞吐量的饱和度是 {{ $value }}%。
+        目前磁盘IO写入吞吐量每秒最大是 {{ printf `max(rate(node_disk_written_bytes_total{instance="%s",job="%s"}[1m])) /1024/1024` $labels.instance $labels.job | query | first | value | printf "%.2f" }}MB/s
+
+  - alert: 磁盘IO读取吞吐较高
+    expr: round(max(rate(node_disk_read_bytes_total[1m])) by (instance,job) / 1024 /1024 /30 * 100 ) > 60
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "实例 {{ $labels.instance }} 磁盘IO读取每秒超过最大30MB/s"
+      description:
+        目前磁盘IO读取吞吐量的饱和度是 {{ $value }}%。
+        目前磁盘IO读取吞吐量每秒最大是 {{ printf `max(rate(node_disk_read_bytes_total{instance="%s",job="%s"}[1m])) /1024/1024` $labels.instance $labels.job | query | first | value | printf "%.2f" }}MB/s
+
+
+- name: 网络告警规则
+  rules:
+  - alert: 网络下载带宽异常
+    expr: max(irate(node_network_receive_bytes_total[1m]) * 8 / 1024 / 1024) by (instance,job,device) / 50 * 100  >= 80
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "实例 {{ $labels.instance }} 的 {{ $labels.device }}接口下载流量已经超过公司实际50Mbps"
+      description: 
+        目前下载带宽已经达到 {{ printf `(irate(node_network_receive_bytes_total{instance="%s",job="%s",device="%s"}[1m]) * 8 / 1024 / 1024)` $labels.instance $labels.job $labels.device | query | first | value | printf "%.2f" }} Mbps/s
+        目前下载带宽使用率在 {{ $value }}%
+
+  - alert: 网络上传带宽异常
+    expr: max(irate(node_network_transmit_bytes_total[1m]) * 8 / 1024 / 1024) by (instance,job,device) / 50 * 100 >= 80
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "实例 {{ $labels.instance }} 的 {{ $labels.device }}接口上传流量已经超过公司实际50Mbps"
+      description: 
+        目前上传带宽已经达到 {{ printf `(irate(node_network_transmit_bytes_total{instance="%s",job="%s",device="%s"}[1m]) * 8 / 1024 / 1024)` $labels.instance $labels.job $labels.device | query | first | value | printf "%.2f" }} Mbps/s
+        目前上传带宽使用率在 {{ $value }}%
+
+
+  - alert: 网络TCP连接数异常
+    expr: node_nf_conntrack_entries / node_nf_conntrack_entries_limit * 100 > 80
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "实例 {{ $labels.instance }} 的 tcp连接数超过80%"
+      description: 
+        目前TCP连接数是 {{ printf `node_nf_conntrack_entries{instance="%s",job="%s"}` $labels.instance $labels.job | query | first | value | printf "%.2f" }}
+        目前TCP连接使用率是 {{ $value }}%
+
+- name: 节点告警
+  rules:
+  - alert: 节点处于Down状态
+    expr: up == 0
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "实例:{{ $labels.instance }} 处于Down状态"
+      description: "{{ $labels.instance }} 节点已连接超时"

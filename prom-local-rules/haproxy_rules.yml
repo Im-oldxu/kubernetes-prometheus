@@ -1,0 +1,101 @@
+groups:
+- name: "Haproxy告警规则"
+  rules:
+  - alert: Haproxy前端活跃会话数过高
+    expr: |
+      avg_over_time(haproxy_frontend_current_sessions[5m]) 
+      / 
+      haproxy_frontend_limit_sessions * 100 > 80
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "实例:{{ $labels.instance }} Haproxy前端活跃会话数占限制比率过高"
+      description: "Haproxy前端'{{ $labels.proxy }}' 活跃会话数占限制的会话数比率超过了80%，当前值为{{ $value }}%。"
+  
+  
+  - alert: Haproxy前端新建会话速率过高
+    expr: |
+      avg_over_time(haproxy_frontend_max_session_rate[5m]) 
+      / 
+      haproxy_frontend_limit_session_rate * 100 > 80
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "实例:{{ $labels.instance }} Haproxy前端新建会话速率占限制比率过高"
+      description: "Haproxy前端'{{ $labels.proxy }}' 每秒新建的会话速率占限制比率已经超过80%，当前值为{{ $value }}%。"
+  
+  
+  - alert: Haproxy前端HTTP响应4xx\5xx错误率过高
+    expr: |
+      rate(haproxy_frontend_http_responses_total{code=~"4xx|5xx"}[5m])
+      /ignoring(code)
+      group_left
+      rate(haproxy_frontend_http_requests_total[5m]) * 100 > 20
+    for: 5m
+    labels:
+      severity: critical
+    annotations:
+      summary: "实例:{{ $labels.instance }} Haproxy前端HTTP响应错误率过高"
+      description: "Haproxy前端'{{ $labels.proxy }}' 的 {{ $labels.code }}状态码占总请求的比率已经超过20%，当前错误率为{{ $value }}%。"
+  
+  
+  
+  - alert: Haproxy后端活跃会话数占限制比率过高
+    expr: |
+      avg_over_time(haproxy_backend_current_sessions[5m]) 
+      / 
+      haproxy_backend_limit_sessions * 100 > 80
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "实例:{{ $labels.instance }} Haproxy后端活跃会话数占限制比率过高"
+      description: "Haproxy后端'{{ $labels.proxy }}' 活跃会话数占总会话数限制的比率超过了80%，当前值为{{ $value }}%。"
+  
+  
+  - alert: Haproxy后端4xx错误率过高
+    expr: |
+      rate(haproxy_backend_http_responses_total{code="4xx"}[5m]) 
+      / 
+      ignoring(code) rate(haproxy_backend_http_requests_total[5m]) * 100 > 10
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "实例:{{ $labels.instance }} Haproxy后端4xx错误率过高 "
+      description: "Haproxy后端'{{ $labels.proxy }}' 的4xx响应错误率超过了10%，当前错误率为{{ $value }}%。"
+  
+  
+  - alert: Haproxy后端5xx错误率过高
+    expr: |
+      rate(haproxy_backend_http_responses_total{code="5xx"}[5m]) 
+      / 
+      ignoring(code) rate(haproxy_backend_http_requests_total[5m]) * 100 > 10
+    for: 5m
+    labels:
+      severity: critical
+    annotations:
+      summary: "实例:{{ $labels.instance }} Haproxy后端5xx错误率过高 "
+      description: "Haproxy后端'{{ $labels.proxy }}' 的5xx响应错误率超过了10%，当前错误率为{{ $value }}%。"
+  
+  
+  - alert: Haproxy后端无活跃服务器
+    expr: haproxy_backend_active_servers < 1
+    for: 5m
+    labels:
+      severity: critical
+    annotations:
+      summary: "实例:{{ $labels.instance }} 后端无活跃服务器"
+      description: "Haproxy '{{ $labels.proxy }}' 后端活跃服务器数量小于1，这意味着整个后端服务不可用，立即检查后端服务器状态。"
+  
+  
+  - alert: Haproxy后端服务器检测失败
+    expr: haproxy_server_check_failures_total == 1
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "实例:{{ $labels.instance }} 后端服务器检测失败"
+      description: "Haproxy '{{ $labels.proxy }}' 后端的 '{{ $labels.server }}' 实例检测失败，可能存在连接问题或服务不稳定。"

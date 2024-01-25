@@ -1,0 +1,47 @@
+groups:
+- name: nginx告警规则
+  rules:
+  - alert: Nginx Server Down
+    expr: nginx_up == 0
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "Nginx 服务不存活, 实例:{{ $labels.instance }}"
+      description: "nginx_exporter连不上Nginx了，当前状态为: {{ $value }}"
+
+  - alert: Nginx活跃连接数过高
+    expr: avg_over_time(nginx_connections_active[5m]) > 500
+    for: 1m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Nginx 活跃连接数过高, 实例:{{ $labels.instance }}"
+      description: " Nginx 的平均活跃连接数超过了设定的500阈值，当前值为 {{ $value }}。"
+
+  - alert: Nginx等待连接数高
+    expr: max_over_time(nginx_connections_waiting[5m]) > 100
+    for: 1m
+    labels:
+      severity: warning
+    annotations:
+       summary: "Nginx 等待连接数过高, 实例:{{ $labels.instance }}"
+       description: "Nginx 的等待连接数超过了设定的100阈值，当前最大值为 {{ $value }}。可能后端服务存在瓶颈。"
+
+  - alert: Nginx读写比率异常
+    expr: (nginx_connections_reading / nginx_connections_writing) * 100 >  10
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+       summary: "Nginx 读写比率异常, 实例:{{ $labels.instance }}"
+       description: "Nginx 读取请求的数量已经高于写请求的数量，当前读请求高于写请求比率是: {{ $value }}"
+
+  - alert: Nginx大量TCP连接处理失败
+    expr: nginx_connections_accepted - nginx_connections_handled > 50
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+       summary: "Nginx 大量TCP连接处理失败, 实例:{{ $labels.instance }}"
+       description: "Nginx 接受的连接数与处理成功的连接数之差超过了50，当前差值为 {{ $value }}"

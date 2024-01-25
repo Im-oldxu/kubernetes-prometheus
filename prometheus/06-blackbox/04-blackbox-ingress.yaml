@@ -1,0 +1,18 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: blackbox-ingress
+  namespace: kube-prom
+spec:
+  ingressClassName: "nginx"
+  rules:
+  - host: "k8s-blackbox.oldxu.net"
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: blackbox-svc
+            port:
+              number: 9115

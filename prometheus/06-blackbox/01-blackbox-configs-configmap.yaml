@@ -1,0 +1,49 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: blackbox-configs
+  namespace: kube-prom
+data:
+  blackbox.yml: |-
+    modules:
+      # http检查模块
+      http_2xx:
+        prober: http
+        http:
+          preferred_ip_protocol: "ip4"
+          valid_http_versions: [ "HTTP/1.1", "HTTP/2.0" ]
+      # Http Post检查模块
+      http_post_2xx:
+        prober: http
+        http:
+          method: POST
+          preferred_ip_protocol: "ip4"
+          valid_http_versions: [ "HTTP/1.1", "HTTP/2.0" ]
+    
+      # TCP检查模块
+      tcp_connect:
+        prober: tcp
+        timeout: 5s
+    
+      # ICMP检查模块
+      icmp:
+        prober: icmp
+        timeout: 5s
+        icmp:
+          preferred_ip_protocol: "ip4"
+    
+      # DNS检查模块
+      dns_tcp:  
+        prober: dns
+        dns:
+          transport_protocol: "tcp"
+          preferred_ip_protocol: "ip4"
+          query_name: "kubernetes.default.svc.cluster.local"
+
+      # SSH检查模块
+      ssh_banner:
+        prober: tcp
+        tcp:
+          query_response:
+          - expect: "^SSH-2.0-"
+          - send: "SSH-2.0-blackbox-ssh-check"

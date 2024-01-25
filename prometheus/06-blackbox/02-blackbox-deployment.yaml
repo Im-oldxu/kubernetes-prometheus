@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: blackbox
+  namespace: kube-prom
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: blackbox
+  template:
+    metadata:
+      labels:
+        app: blackbox
+    spec:
+      volumes:
+      - name: blackbox-cfg
+        configMap:
+          name: blackbox-configs
+      containers:
+      - name: blackbox
+        image: prom/blackbox-exporter:v0.24.0
+        args:
+        - "--web.listen-address=:9115"
+        - "--config.file=/etc/blackbox_exporter/blackbox.yml"
+        volumeMounts:
+        - name: blackbox-cfg
+          mountPath: /etc/blackbox_exporter
+        ports:
+        - containerPort: 9115

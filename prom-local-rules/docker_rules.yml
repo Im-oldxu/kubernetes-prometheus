@@ -1,0 +1,59 @@
+groups:
+- name: Docker的告警规则
+  rules:
+  - alert: 容器CPU利用率高
+    expr: sum(rate(container_cpu_usage_seconds_total{name!=""}[1m])) by (instance,name) * 100 > 80
+    for: 1m
+    labels:
+      severity: warning
+    annotations:
+      summary: "实例{{ $labels.instance }}的容器{{ $labels.name }}CPU利用率高"
+      description: "容器{{ $labels.name }}的CPU利用率当前为{{ $value }}%，超过了80%的阈值。"
+
+  - alert: 容器内存利用率高
+    expr: |
+      sum(container_memory_working_set_bytes{name!=""}) by (instance,name) / 
+      sum(container_spec_memory_limit_bytes{name!=""} > 0) by (instance,name) * 100 > 80
+    for: 1m
+    labels:
+      severity: warning
+    annotations:
+      summary: "实例{{ $labels.instance }}的容器{{ $labels.name }}内存利用率高"
+      description: 容器{{ $labels.name }}的内存最大限制是{{ printf `sum(container_spec_memory_limit_bytes{instance="%s",name="%s"} > 0)  /1024 /1024` $labels.instance $labels.name | query | first | value }}MB , 目前利用率已达{{ $value }}%，超过限制的80%。
+
+  - alert: 容器整体内存利用率过高
+    expr: sum(container_memory_working_set_bytes{name!=""}) / sum(machine_memory_bytes) * 100 > 80
+    for: 1m
+    labels:
+      severity: warning
+    annotations:
+      summary: "所有容器的总内存利用率过高"
+      description: "当前所有容器占用物理内存的总量为{{ $value }}%，超过了物理内存的80%阈值。"
+
+
+  - alert: 容器网络发送速率过高
+    expr: sum(rate(container_network_transmit_bytes_total{name!=""}[1m])) by (instance,job,name) * 8 / 1024 / 1024 > 50
+    for: 1m
+    labels:
+      severity: warning
+    annotations:
+      summary: "实例{{ $labels.instance }}的容器{{ $labels.name }}网络发送速率过高"
+      description: "容器{{ $labels.name }}的网络发送速率达到{{ $value }}Mbps，超过了50Mbps的阈值。"
+
+  - alert: 容器网络接收速率过高
+    expr: sum(rate(container_network_receive_bytes_total{name!=""}[1m])) by (instance,job,name) * 8 / 1024 / 1024 > 50
+    for: 1m
+    labels:
+      severity: warning
+    annotations:
+      summary: "实例{{ $labels.instance }}的容器{{ $labels.name }}网络接收速率过高"
+      description: "容器{{ $labels.name }}的网络接收速率达到{{ $value }}Mbps，超过了50Mbps的阈值。"
+
+  - alert: 容器停止时间过长
+    expr: sum(time() - container_last_seen{name!=""}) by (instance,name) > 60
+    for: 1m
+    labels:
+      severity: critical
+    annotations:
+      summary: "实例{{ $labels.instance }}的容器{{ $labels.name }}已停止"
+      description: "容器{{ $labels.name }}已停止运行超过60秒。当前停止时长 {{ $value }}s"

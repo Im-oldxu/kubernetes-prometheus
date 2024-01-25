@@ -1,0 +1,19 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: alert-ingress
+  namespace: kube-prom
+spec:
+  ingressClassName: "nginx"
+  rules:
+  - host: "k8s-alert.oldxu.net"
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: alertmanager-svc
+            port:
+              number: 9093
+   

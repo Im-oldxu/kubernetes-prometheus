@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: grafana
+  namespace: kube-prom
+spec:
+  serviceName: "grafana-svc"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+    spec:
+      securityContext:
+        fsGroup: 472    # 当 Pod 启动时，Kubernetes 会自动将此组 ID 应用到 Pod 级别共享的存储上（比如持久卷）。
+      containers:
+      - name: grafana
+        image: grafana/grafana:10.2.2
+        env:
+        - name: GF_SECURITY_ADMIN_USER
+          value: "admin"
+        - name: GF_SECURITY_ADMIN_PASSWORD
+          value: "oldxu123"
+        volumeMounts:
+        - name: grafana-data
+          mountPath: /var/lib/grafana
+        ports:
+        - containerPort: 3000
+        readinessProbe:
+          httpGet:
+            path: /api/health
+            port: 3000
+            scheme: HTTP
+          initialDelaySeconds: 60
+          failureThreshold: 10
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 30
+        livenessProbe:
+          httpGet:
+            path: /api/health
+            port: 3000
+            scheme: HTTP
+          initialDelaySeconds: 60
+          failureThreshold: 10
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 30
+        resources:
+          requests:
+            cpu: 500m
+            memory: 2048Mi
+          limits:
+            cpu: 500m
+            memory: 2048Mi
+  volumeClaimTemplates:
+    - metadata:
+        name: grafana-data
+      spec:
+        accessModes: ["ReadWriteMany"]
+        storageClassName: "nfs-provisioner-storage"
+        resources:
+          requests:
+            storage: 100Gi

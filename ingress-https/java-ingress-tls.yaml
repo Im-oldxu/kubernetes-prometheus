@@ -1,0 +1,21 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: java-ingress-tls
+spec:
+  ingressClassName: "nginx"
+  tls:                          # https
+  - hosts:
+    - java.oldxu.net
+    secretName: java-oldxu-tls	# secrets资源名称
+  rules:
+  - host: java.oldxu.net
+    http:
+      paths:
+      - pathType: Prefix
+        path: "/"
+        backend:
+          service:
+            name: java-service
+            port:
+              number: 8080

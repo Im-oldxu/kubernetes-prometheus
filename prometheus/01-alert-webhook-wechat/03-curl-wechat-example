@@ -1,0 +1,35 @@
+curl -X POST http://<service_ip>:5001/alert?token=<企业微信机器人token> \
+-H "Content-Type: application/json" \
+-d '{
+  "alerts": [
+    { 
+      "status": "firing",
+      "labels": {
+        "severity": "critical",
+        "alertname": "InstanceDown",
+        "instance": "example1"
+      },
+      "annotations": {
+        "summary": "Instance example1 down",
+        "description": "The instance example1 is down."
+      },
+      "startsAt": "2024-01-20T15:04:05Z",
+      "endsAt": "0001-01-01T00:00:00Z"
+    },
+	{
+      "status": "resolved",
+      "labels": {
+        "severity": "critical",
+        "alertname": "InstanceDown",
+        "instance": "example1"
+      },
+      "annotations": {
+        "summary": "Instance example1 is back up",
+        "description": "The instance example1 has recovered."
+      },
+      "startsAt": "2023-12-20T15:04:05Z",
+      "endsAt": "2023-12-20T16:04:05Z"
+
+    }
+  ]
+}'
