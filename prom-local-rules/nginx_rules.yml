@@ -29,13 +29,13 @@ groups:
        description: "Nginx 的等待连接数超过了设定的100阈值，当前最大值为 {{ $value }}。可能后端服务存在瓶颈。"
 
   - alert: Nginx读写比率异常
-    expr: (nginx_connections_reading / nginx_connections_writing) * 100 >  10
+    expr: (nginx_connections_reading - nginx_connections_writing) / nginx_connections_reading * 100 >  10
     for: 1m
     labels:
       severity: critical
     annotations:
        summary: "Nginx 读写比率异常, 实例:{{ $labels.instance }}"
-       description: "Nginx 读取请求的数量已经高于写请求的数量，当前读请求高于写请求比率是: {{ $value }}"
+       description: "Nginx 读取请求的数量高于写请求的数量，当前读请求高于写请求比率是: {{ $value }}"
 
   - alert: Nginx大量TCP连接处理失败
     expr: nginx_connections_accepted - nginx_connections_handled > 50
