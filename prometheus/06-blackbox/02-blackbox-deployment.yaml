@@ -19,7 +19,7 @@ spec:
           name: blackbox-configs
       containers:
       - name: blackbox
-        image: prom/blackbox-exporter:v0.24.0
+        image: uhub.service.ucloud.cn/oldxu/prom/blackbox-exporter:v0.25.0
         args:
         - "--web.listen-address=:9115"
         - "--config.file=/etc/blackbox_exporter/blackbox.yml"

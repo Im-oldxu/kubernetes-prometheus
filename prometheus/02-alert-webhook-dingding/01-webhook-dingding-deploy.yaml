@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
       - name: dingding
-        image: oldxu3957/webhook_dingding_oldxu:v1.0
+        image: uhub.service.ucloud.cn/oldxu/webhook_dingding_oldxu:v1.0
         args: ["--port","5002"]
         ports:
         - containerPort: 5002

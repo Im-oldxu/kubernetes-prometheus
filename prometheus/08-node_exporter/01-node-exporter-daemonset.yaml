@@ -37,7 +37,7 @@ spec:
       # 容器的具体配置
       containers:
       - name: node
-        image: prom/node-exporter:v1.7.0
+        image: uhub.service.ucloud.cn/oldxu/prom/node-exporter:v1.8.1
         args:
         - "--web.listen-address=:9100"
         - "--web.max-requests=40"

@@ -24,7 +24,7 @@ spec:
           name: alert-template
       containers:
       - name: alertmanager
-        image: prom/alertmanager:v0.26.0
+        image: uhub.service.ucloud.cn/oldxu/prom/alertmanager:v0.27.0
         args:
         - "--web.listen-address=:9093"
         - "--cluster.listen-address=0.0.0.0:9094"
@@ -49,11 +49,11 @@ spec:
           containerPort: 9094
         resources:
           requests:
-            cpu: 100m
-            memory: 100Mi
+            cpu: 200m
+            memory: 200Mi
           limits:
-            cpu: 100m
-            memory: 100Mi
+            cpu: 200m
+            memory: 200Mi
   volumeClaimTemplates:
     - metadata:
         name: alert-data

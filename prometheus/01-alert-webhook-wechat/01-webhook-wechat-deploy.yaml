@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
       - name: wechat
-        image: oldxu3957/webhook_wechat_oldxu:v1.0
+        image: uhub.service.ucloud.cn/oldxu/webhook_wechat_oldxu:v1.0
         args: ["--port","5001"]
         ports:
         - containerPort: 5001

@@ -18,12 +18,12 @@ spec:
         fsGroup: 472    # 当 Pod 启动时，Kubernetes 会自动将此组 ID 应用到 Pod 级别共享的存储上（比如持久卷）。
       containers:
       - name: grafana
-        image: grafana/grafana:10.2.2
+        image: uhub.service.ucloud.cn/oldxu/grafana/grafana:11.0.0
         env:
         - name: GF_SECURITY_ADMIN_USER
           value: "admin"
         - name: GF_SECURITY_ADMIN_PASSWORD
-          value: "oldxu123"
+          value: "admin"
         volumeMounts:
         - name: grafana-data
           mountPath: /var/lib/grafana

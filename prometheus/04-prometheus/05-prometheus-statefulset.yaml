@@ -24,7 +24,7 @@ spec:
           name: prom-rules
       containers:
       - name: prom
-        image: prom/prometheus:v2.48.1
+        image: uhub.service.ucloud.cn/oldxu/prom/prometheus:v2.53.0
         args:
         - "--config.file=/etc/prometheus/prometheus.yml"
         - "--storage.tsdb.path=/etc/prometheus/data"
